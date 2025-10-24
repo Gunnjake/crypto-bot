@@ -1,0 +1,15 @@
+name: Test Self-Hosted Runner
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  verify:
+    runs-on: self-hosted
+    steps:
+      - name: Print confirmation
+        run: |
+          echo "✅ Runner is working on $(hostname)"
+          uname -a
