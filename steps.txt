@@ -1,0 +1,14 @@
+Bot Cycle - Quick Notes
+1. Time Sync: Syncs local clock with Binance server to prevent timestamp API errors.
+2. Scheduled Tasks: Checks if 24 hours have passed, sends daily performance summary to Discord.
+3. Trading Cycle:
+    Select Strategy: Chooses trading strategy (Aggressive/Moderate/Stop) based on the current hour.
+    Portfolio Risk Check: Halts all new BUY orders if total portfolio value is below the safety threshold.
+    Loop Through Coins: Analyzes each coin one-by-one:
+        Get Data: Fetches the last 3 days of price data for the coin.
+        Calculate Indicators: Calculates Simple Moving Average (SMA) (if short term avg above long term avg buy) and Relative Strength Index (RSI) (checks if the price has gone up to fast).
+        Check Position: Reads the trade log to determine if there is an existing open position.
+        Crash Check: Checks for a sudden price crash and skips the coin if one is detected.
+        Generate Signal: Generates a BUY/SELL/HOLD signal based on SMA crossover, confirmed by the RSI.
+        Execute Trade: Places a limit order if the signal is valid and logs the trade to a CSV file.
+Sleep: Pauses for 60 seconds before starting the next cycle.

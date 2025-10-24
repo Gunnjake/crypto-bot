@@ -1,0 +1,67 @@
+# Crypto Trading Bot: Key Features & Architectural Decisions
+
+## Core Features (What it Does)
+
+* **Automated Trading:** Executes live BUY and SELL limit orders on the Binance.us exchange without manual intervention.
+
+* **Dual-Strategy System:** The bot uses a time-based framework to adapt its trading approach to market conditions:
+    * **Moderate Strategy:** Operates during normal market hours. It analyzes longer-term 1-hour price data to make more conservative, 
+        trend-focused decisions.
+    * **Aggressive Strategy:** Activates during specific, potentially more volatile hours. It switches to short-term 1-minute price 
+        data to react more quickly to rapid price movements.
+
+* **Technical Analysis Strategy:** The bot's trading decisions are based on a two-indicator system for higher-probability trades:
+    * **Primary Signal (SMA Crossover):** The bot uses a fast and a slow Simple Moving Average. When the short-term average price 
+        crosses above the long-term average (a "Golden Cross"), it's a BUY signal. When it crosses below (a "Death Cross"), 
+        it's a SELL signal. This identifies the start of a new trend.
+    * **Confirmation Filter (RSI):** The Relative Strength Index is used as a safety check. For example, even if a BUY signal occurs, 
+        the bot will ignore it if the RSI shows the asset is already "overbought." This prevents the bot from buying at a potential 
+        price peak right before a correction.
+
+* **Live Web Dashboard:** Provides a real-time, browser-based view of the bot's performance, including total portfolio value, unrealized P&L, 
+    win rate, and a live-updating chart of the account's value history.
+
+* **Automated Notifications:** Sends daily performance summaries and critical error alerts directly to a Discord channel via webhooks, 
+    ensuring constant visibility into the bot's status.
+
+* **Persistent Logging:** Records every trade and the total daily portfolio value to CSV files, creating a permanent and auditable 
+    history of all activity.
+
+---
+
+## Architectural Decisions (Why it was Built This Way)
+
+* **Modular Design (Separation of Concerns):**
+    * **What it is:** The project is broken into distinct Python files, each with a single responsibility (e.g., `binance_client.py` only 
+        talks to the API, `strategy.py` only contains trading logic).
+    * **Why:** This makes the code incredibly easy to maintain, debug, and upgrade. For example, to change the trading strategy, I only need to 
+        edit `strategy.py` without touching the API connection or logging code. It also makes the system easier to explain and understand.
+
+* **Centralized Configuration:**
+    * **What it is:** All important settings—like API details, coin lists, and strategy parameters—are stored in a single `config.py` file.
+    * **Why:** This allows for rapid tuning and adjustment of the bot's behavior without hunting through multiple files. I can switch from 
+        an aggressive to a conservative strategy by changing just a few lines in one place.
+
+* **Secure API Key Management:**
+    * **What it is:** The bot loads sensitive API keys from environment variables instead of hard-coding them directly into the script. 
+        A separate `key_tester.py` utility is included for validation.
+    * **Why:** This is a critical security practice. It prevents secret keys from being accidentally exposed, especially if the code were 
+        to be shared or committed to a public repository.
+
+* **State Management via Flat-File Logging:**
+    * **What it is:** The bot determines if it has an open position for a specific coin by reading the `trade_log.csv` file to see if the last 
+        action was a BUY or a SELL.
+    * **Why:** For a single-instance bot, using a simple CSV file is a robust and transparent way to manage state. It avoids the complexity 
+        of a full database, is human-readable for easy debugging, and persists even if the bot is stopped and restarted.
+
+* **Resilience through Time-Synchronization:**
+    * **What it is:** Before starting its main loop, the bot makes a dedicated API call to get Binance's server time and calculates 
+        the offset with the local machine's clock. This offset is applied to all subsequent requests.
+    * **Why:** This directly solves a common exchange API error (`-1021: Timestamp for this request is outside of the recvWindow`) 
+        which can halt trading. It makes the bot more reliable, especially when running on a server that might have a slight clock drift.
+
+* **Decoupled Dashboard (API Backend + Static Frontend):**
+    * **What it is:** The dashboard is built as a simple Flask API (`dashboard.py`) that serves data as JSON. The frontend is a standard HTML 
+        file with JavaScript that fetches this data.
+    * **Why:** This is a standard and scalable web architecture. It separates the data logic (Python) from the presentation logic (HTML/JS), 
+        making both easier to manage. The frontend could be completely redesigned without any changes to the backend.

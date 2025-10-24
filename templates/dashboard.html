@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Binance Trading Bot Dashboard</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for graphing -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #111827; color: #e5e7eb; font-family: 'Inter', sans-serif; }
+        .metric-card { background-color: #1f2937; border: 1px solid #374151; }
+        .positive { color: #22c55e; }
+        .negative { color: #ef4444; }
+        .table-header { background-color: #374151; }
+        .table-row { border-color: #374151; }
+    </style>
+</head>
+<body class="p-4 sm:p-6 lg:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-white">Trading Bot Dashboard</h1>
+            <p class="text-gray-400">Live data from your Binance.us account. Last updated: <span id="last-updated">Never</span></p>
+        </header>
+
+        <!-- Live Metrics Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="metric-card rounded-lg p-6">
+                <h2 class="text-sm font-medium text-gray-400">Total Portfolio Value</h2>
+                <p id="portfolio-value" class="text-3xl font-semibold text-white mt-1">$0.00</p>
+            </div>
+            <div class="metric-card rounded-lg p-6">
+                <h2 class="text-sm font-medium text-gray-400">Unrealized P&L</h2>
+                <p id="unrealized-pnl" class="text-3xl font-semibold text-white mt-1">$0.00</p>
+            </div>
+             <div class="metric-card rounded-lg p-6">
+                <h2 class="text-sm font-medium text-gray-400">Unrealized P&L (%)</h2>
+                <p id="unrealized-pct" class="text-3xl font-semibold text-white mt-1">0.00%</p>
+            </div>
+        </div>
+        
+        <!-- Performance Metrics Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="metric-card rounded-lg p-6">
+                <h2 class="text-sm font-medium text-gray-400">Realized P&L (from Sells)</h2>
+                <p id="realized-pnl" class="text-3xl font-semibold text-white mt-1">$0.00</p>
+            </div>
+            <div class="metric-card rounded-lg p-6">
+                <h2 class="text-sm font-medium text-gray-400">Win Rate</h2>
+                <p id="win-rate" class="text-3xl font-semibold text-white mt-1">0.00%</p>
+            </div>
+             <div class="metric-card rounded-lg p-6">
+                <h2 class="text-sm font-medium text-gray-400">Total Trades (Sells)</h2>
+                <p id="total-trades" class="text-3xl font-semibold text-white mt-1">0</p>
+            </div>
+        </div>
+
+
+        <!-- Chart -->
+        <div class="metric-card rounded-lg p-6 mb-8">
+            <h2 class="text-lg font-medium text-white mb-4">Portfolio Value History (Live)</h2>
+            <div class="h-96">
+                <canvas id="portfolio-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Balances Table -->
+        <div class="metric-card rounded-lg overflow-hidden">
+             <h2 class="text-lg font-medium text-white p-6">Live Asset Balances</h2>
+            <table class="min-w-full divide-y divide-gray-700">
+                <thead class="table-header">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Asset</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Quantity</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">USD Value</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">24h Change</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Unrealized P&L</th>
+                    </tr>
+                </thead>
+                <tbody id="balances-table" class="divide-y divide-gray-800">
+                    <!-- Rows will be inserted here by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Get the canvas element for the chart
+        const ctx = document.getElementById('portfolio-chart').getContext('2d');
+        let portfolioChart; // Variable to hold the chart instance
+
+        /**
+         * Initializes the chart with a default empty state.
+         */
+        function initializeChart() {
+            portfolioChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [], // Start with empty labels
+                    datasets: [{
+                        label: 'Portfolio Value (USD)',
+                        data: [], // Start with empty data
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: { color: '#9ca3af' },
+                            grid: { color: '#374151' }
+                        },
+                        x: {
+                            ticks: { color: '#9ca3af', maxRotation: 0, autoSkip: true, maxTicksLimit: 10 },
+                            grid: { color: '#374151' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+        
+        /**
+         * Adds a class to an element based on whether a value is positive or negative.
+         */
+        function applyColor(element, value) {
+            element.classList.remove('positive', 'negative');
+            if (value > 0) {
+                element.classList.add('positive');
+            } else if (value < 0) {
+                element.classList.add('negative');
+            }
+        }
+
+
+        /**
+         * Fetches data from the backend API and updates the entire dashboard.
+         */
+        async function fetchData() {
+            try {
+                // ✅ FIX: Added a cache-busting parameter to the URL
+                const response = await fetch(`/data/binance?_=${new Date().getTime()}`);
+                if (!response.ok) {
+                    console.error("Failed to fetch data from backend.");
+                    return;
+                }
+                const data = await response.json();
+
+                // --- 1. Update Live Metric Cards ---
+                const portfolioValueEl = document.getElementById('portfolio-value');
+                const unrealizedPnlEl = document.getElementById('unrealized-pnl');
+                const unrealizedPctEl = document.getElementById('unrealized-pct');
+
+                portfolioValueEl.textContent = data.live_metrics.portfolio_value;
+                unrealizedPnlEl.textContent = data.live_metrics.unrealized_pnl;
+                unrealizedPctEl.textContent = data.live_metrics.unrealized_pct;
+                
+                applyColor(unrealizedPnlEl, parseFloat(data.live_metrics.unrealized_pnl.replace(/[^0-9.-]+/g,"")));
+                applyColor(unrealizedPctEl, parseFloat(data.live_metrics.unrealized_pct.replace(/[^0-9.-]+/g,"")));
+
+                // --- 2. Update Performance Cards ---
+                const realizedPnlEl = document.getElementById('realized-pnl');
+                const winRateEl = document.getElementById('win-rate');
+                const totalTradesEl = document.getElementById('total-trades');
+                
+                realizedPnlEl.textContent = data.performance_metrics.realized_pnl;
+                winRateEl.textContent = data.performance_metrics.win_rate;
+                totalTradesEl.textContent = data.performance_metrics.total_trades;
+                
+                applyColor(realizedPnlEl, parseFloat(data.performance_metrics.realized_pnl.replace(/[^0-9.-]+/g,"")));
+
+
+                // --- 3. Update the Portfolio History Chart ---
+                if (data.live_history) {
+                    // Extract labels (time) and data points (value) from the history
+                    const labels = data.live_history.map(point => new Date(point.time).toLocaleTimeString());
+                    const chartData = data.live_history.map(point => point.value);
+                    
+                    // Correctly update the chart's data and redraw it
+                    portfolioChart.data.labels = labels;
+                    portfolioChart.data.datasets[0].data = chartData;
+                    portfolioChart.update();
+                }
+
+
+                // --- 4. Update the Balances Table ---
+                const tableBody = document.getElementById('balances-table');
+                tableBody.innerHTML = ''; // Clear existing rows
+                data.live_balances.forEach(b => {
+                    if (b.usd_value > 0.01) { // Only show assets with meaningful value
+                        const pnl24h = b.pnl_24h.toFixed(2);
+                        const pnl24hpct = b.pnl_24h_pct.toFixed(2);
+                        const pnl24h_sign = b.pnl_24h >= 0 ? '+' : '';
+                        
+                        const unrealizedPnl = b.unrealized_pnl.toFixed(2);
+                        const unrealizedPnlPct = b.unrealized_pnl_pct.toFixed(2);
+                        const unrealized_sign = b.unrealized_pnl >= 0 ? '+' : '';
+                        
+                        const row = `
+                            <tr class="table-row">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">${b.asset}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300 text-right">${parseFloat(b.free).toFixed(6)}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300 text-right">$${b.usd_value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-right ${b.pnl_24h >= 0 ? 'positive' : 'negative'}">
+                                    ${pnl24h_sign}$${pnl24h} (${pnl24h_sign}${pnl24hpct}%)
+                                </td>
+                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-right ${b.unrealized_pnl >= 0 ? 'positive' : 'negative'}">
+                                    ${unrealized_sign}$${unrealizedPnl} (${unrealized_sign}${unrealizedPnlPct}%)
+                                </td>
+                            </tr>
+                        `;
+                        tableBody.innerHTML += row;
+                    }
+                });
+
+                // --- 5. Update Timestamp ---
+                document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
+
+            } catch (error) {
+                console.error("Error fetching or processing dashboard data:", error);
+            }
+        }
+
+        // --- Main Execution ---
+        // When the page loads, initialize the chart and then fetch data immediately.
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeChart();
+            fetchData();
+            // Then, set it to automatically refresh every X seconds, defined in config.py
+            setInterval(fetchData, {{ refresh_rate }});
+        });
+    </script>
+
+</body>
+</html>
+
+
