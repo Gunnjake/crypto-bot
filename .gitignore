@@ -1,4 +1,22 @@
-venv/ 
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.env
+*.log
+.DS_Store
+
+# ---- OS / Editor ----
+.idea/
+.vscode/
+*.swp
+
+# ---- Database / Secrets ----
+*.db
+*.sqlite
+*.sql
+db_backups/venv/ 
 __pycache__/
 .env
 *.pyc
